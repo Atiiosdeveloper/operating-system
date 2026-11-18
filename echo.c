@@ -1,13 +1,11 @@
-#include<stdio.h>
-#include<unistd.h>
-#include<string.h> 
+
 
 ssize_t my_write(int fd, const void *buf, size_t count)
 {
         register ssize_t result asm("rax");
         register int rdi asm("rdi") = fd
         register const void *rsi asm("rsi") = buf;
-        register size_t rdx asm("rdx") = count;
+        register size_t rdx asm("rdx") = count
 
         asm volatile(
                 "mov $1, %%eax\n\t"
