@@ -1,34 +1,45 @@
+#include <fcntl.h>
+#include <unistd.h>
 
+#define BUFFER_SIZE 4096
 
-ssize_t my_write(int fd, const void *buf, size_t count)
+static void write_all(int fd, const char *data, ssize_t length)
 {
-        register ssize_t result asm("rax");
-        register int rdi asm("rdi") = fd
-        register const void *rsi asm("rsi") = buf;
-        register size_t rdx asm("rdx") = count
+	ssize_t sent = 0;
 
-        asm volatile(
-                "mov $1, %%eax\n\t"
-                "syscall"
-                : "=r"(result)
-                : "r"(rdi), "r"(rsi), "r"(rdx)
-                : "rcx", "rll", "memory"
-        );
+	while (sent < length) {
+		ssize_t result = write(fd, data + sent, length - sent);
 
-        return result;
+		if (result <= 0) {
+			return;
+		}
+
+		sent += result;
+	}
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
-        for(int i = 1; i < argc; i++)
-        {
-                my_write(1, argv[i], strlen(argv[i]));
-                if(i < argc - 1){
-                        my_write(1, " ", 1);   //try to find out  smth make oc calls only once
-                }
-                //printf((i != argc - 1) ? "%s " : "%s", argv[i]);
-        }
-        my_write(1, "\n", 1);
+	int num_files = argc - 1;
+	int fds[num_files > 0 ? num_files : 1];
+	char buffer[BUFFER_SIZE];
+	ssize_t received;
 
-         return 0;
+	for (int i = 0; i < num_files; i++) {
+		fds[i] = open(argv[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	}
+
+	while ((received = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0) {
+		write_all(STDOUT_FILENO, buffer, received);
+
+		for (int i = 0; i < num_files; i++) {
+			write_all(fds[i], buffer, received);
+		}
+	}
+
+	for (int i = 0; i < num_files; i++) {
+		close(fds[i]);
+	}
+
+	return 0;
 }
